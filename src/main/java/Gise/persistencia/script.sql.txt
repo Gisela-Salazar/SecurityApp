@@ -1,0 +1,33 @@
+CREATE DATABASE SecurityDB2025;
+GO
+USE SecurityDB2025;
+GO
+-- Tabla de usuarios
+CREATE TABLE Users (
+    id INT PRIMARY KEY IDENTITY(1,1),
+    name VARCHAR(100) NOT NULL,
+    passwordHash VARCHAR (64) NOT NULL,
+    email VARCHAR(200) NOT NULL UNIQUE,
+    status TINYINT NOT NULL
+);
+GO
+
+-- Tabla de cargos
+CREATE TABLE Positions (
+    id INT PRIMARY KEY IDENTITY(1,1),
+    title VARCHAR(100) NOT NULL,
+    description TEXT NULL
+);
+GO
+
+-- Tabla de empleados
+CREATE TABLE Employees (
+    id INT PRIMARY KEY IDENTITY(1,1),
+    name VARCHAR(100) NOT NULL,
+    positionId INT NOT NULL, -- Relación con la tabla de cargos
+    hireDate DATE NOT NULL,
+    salary DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (positionId) REFERENCES Positions(id) -- Relación con la tabla de cargos
+);
+GO
+
