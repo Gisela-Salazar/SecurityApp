@@ -8,200 +8,157 @@ import java.util.ArrayList;
 import Gise.dominio.Position;
 
 public class PositionDAO {
+    // Manejador de conexión a la base de datos
     private ConnectionManager conn;
-    private PreparedStatement ps;
-    private ResultSet rs;
 
+    // Constructor: inicializa la conexión con la base de datos
     public PositionDAO(){
         conn = ConnectionManager.getInstance();
     }
 
     /**
-     * Crea un nuevo cargo en la base de datos.
+     * Crea un nuevo cargo en la base de datos y retorna el objeto creado.
      */
     public Position create(Position position) throws SQLException {
         Position res = null;
-        try{
-            PreparedStatement ps = conn.connect().prepareStatement(
-                    "INSERT INTO " +
-                            "Positions (title, description)" +
-                            "VALUES (?, ?)",
-                    java.sql.Statement.RETURN_GENERATED_KEYS
-            );
+        String sql = "INSERT INTO Positions (title, description) VALUES (?, ?)";
+
+        try (PreparedStatement ps = conn.connect().prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, position.getTitle());
             ps.setString(2, position.getDescription());
 
             int affectedRows = ps.executeUpdate();
 
             if (affectedRows != 0) {
-                ResultSet generatedKeys = ps.getGeneratedKeys();
-                if (generatedKeys.next()) {
-                    int idGenerado = generatedKeys.getInt(1);
-                    res = getById(idGenerado);
-                } else {
-                    throw new SQLException("Creating position failed, no ID obtained.");
+                try (ResultSet generatedKeys = ps.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        int idGenerado = generatedKeys.getInt(1);
+                        res = getById(idGenerado);
+                    } else {
+                        throw new SQLException("Creating position failed, no ID obtained.");
+                    }
                 }
             }
-            ps.close();
-        }catch (SQLException ex){
+        } catch (SQLException ex) {
             throw new SQLException("Error al crear el cargo: " + ex.getMessage(), ex);
         } finally {
-            ps = null;
             conn.disconnect();
         }
         return res;
     }
 
     /**
-     * Actualiza la información de un cargo existente en la base de datos.
+     * Obtiene un cargo por su ID.
      */
-    public boolean update(Position position) throws SQLException{
-        boolean res = false;
-        try{
-            ps = conn.connect().prepareStatement(
-                    "UPDATE Positions " +
-                            "SET title = ?, description = ? " +
-                            "WHERE id = ?"
-            );
+    public Position getById(int id) throws SQLException {
+        Position position = null;
+        String sql = "SELECT id, title, description FROM Positions WHERE id = ?";
 
-            ps.setString(1, position.getTitle());
-            ps.setString(2, position.getDescription());
-            ps.setInt(3, position.getId());
-
-            if(ps.executeUpdate() > 0){
-                res = true;
-            }
-            ps.close();
-        }catch (SQLException ex){
-            throw new SQLException("Error al modificar el cargo: " + ex.getMessage(), ex);
-        } finally {
-            ps = null;
-            conn.disconnect();
-        }
-
-        return res;
-    }
-
-    /**
-     * Elimina un cargo de la base de datos basándose en su ID.
-     */
-    public boolean delete(Position position) throws SQLException{
-        boolean res = false;
-        try{
-            ps = conn.connect().prepareStatement(
-                    "DELETE FROM Positions WHERE id = ?"
-            );
-            ps.setInt(1, position.getId());
-
-            if(ps.executeUpdate() > 0){
-                res = true;
-            }
-            ps.close();
-        }catch (SQLException ex){
-            throw new SQLException("Error al eliminar el cargo: " + ex.getMessage(), ex);
-        } finally {
-            ps = null;
-            conn.disconnect();
-        }
-
-        return res;
-    }
-
-    /**
-     * Busca cargos en la base de datos cuyo título contenga la cadena de búsqueda proporcionada.
-     */
-    public ArrayList<Position> search(String title) throws SQLException{
-        ArrayList<Position> records = new ArrayList<>();
-
-        try {
-            ps = conn.connect().prepareStatement("SELECT id, title, description " +
-                    "FROM Positions " +
-                    "WHERE title LIKE ?");
-
-            ps.setString(1, "%" + title + "%");
-
-            rs = ps.executeQuery();
-
-            while (rs.next()){
-                Position position = new Position();
-                position.setId(rs.getInt(1));
-                position.setTitle(rs.getString(2));
-                position.setDescription(rs.getString(3));
-                records.add(position);
-            }
-            ps.close();
-            rs.close();
-        } catch (SQLException ex){
-            throw new SQLException("Error al buscar cargos: " + ex.getMessage(), ex);
-        } finally {
-            ps = null;
-            rs = null;
-            conn.disconnect();
-        }
-        return records;
-    }
-
-    /**
-     * Obtiene un cargo de la base de datos basado en su ID.
-     */
-    public Position getById(int id) throws SQLException{
-        Position position = new Position();
-
-        try {
-            ps = conn.connect().prepareStatement("SELECT id, title, description " +
-                    "FROM Positions " +
-                    "WHERE id = ?");
-
+        try (PreparedStatement ps = conn.connect().prepareStatement(sql)) {
             ps.setInt(1, id);
 
-            rs = ps.executeQuery();
-
-            if (rs.next()) {
-                position.setId(rs.getInt(1));
-                position.setTitle(rs.getString(2));
-                position.setDescription(rs.getString(3));
-            } else {
-                position = null;
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    position = new Position();
+                    position.setId(rs.getInt(1));
+                    position.setTitle(rs.getString(2));
+                    position.setDescription(rs.getString(3));
+                }
             }
-            ps.close();
-            rs.close();
-        } catch (SQLException ex){
+        } catch (SQLException ex) {
             throw new SQLException("Error al obtener un cargo por id: " + ex.getMessage(), ex);
         } finally {
-            ps = null;
-            rs = null;
             conn.disconnect();
         }
         return position;
     }
 
     /**
+     * Actualiza la información de un cargo en la base de datos.
+     */
+    public boolean update(Position position) throws SQLException {
+        boolean res = false;
+        String sql = "UPDATE Positions SET title = ?, description = ? WHERE id = ?";
+
+        try (PreparedStatement ps = conn.connect().prepareStatement(sql)) {
+            ps.setString(1, position.getTitle());
+            ps.setString(2, position.getDescription());
+            ps.setInt(3, position.getId());
+
+            res = ps.executeUpdate() > 0;
+        } catch (SQLException ex) {
+            throw new SQLException("Error al modificar el cargo: " + ex.getMessage(), ex);
+        } finally {
+            conn.disconnect();
+        }
+        return res;
+    }
+
+    /**
+     * Elimina un cargo de la base de datos por su ID.
+     */
+    public boolean delete(Position position) throws SQLException {
+        boolean res = false;
+        String sql = "DELETE FROM Positions WHERE id = ?";
+
+        try (PreparedStatement ps = conn.connect().prepareStatement(sql)) {
+            ps.setInt(1, position.getId());
+            res = ps.executeUpdate() > 0;
+        } catch (SQLException ex) {
+            throw new SQLException("Error al eliminar el cargo: " + ex.getMessage(), ex);
+        } finally {
+            conn.disconnect();
+        }
+        return res;
+    }
+
+    /**
      * Obtiene todos los cargos disponibles en la base de datos.
      */
-    public ArrayList<Position> getAll() throws SQLException{
+    public ArrayList<Position> getAll() throws SQLException {
         ArrayList<Position> records = new ArrayList<>();
+        String sql = "SELECT id, title, description FROM Positions ORDER BY title";
 
-        try {
-            ps = conn.connect().prepareStatement("SELECT id, title, description " +
-                    "FROM Positions " +
-                    "ORDER BY title");
+        try (PreparedStatement ps = conn.connect().prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
 
-            rs = ps.executeQuery();
-
-            while (rs.next()){
+            while (rs.next()) {
                 Position position = new Position();
                 position.setId(rs.getInt(1));
                 position.setTitle(rs.getString(2));
                 position.setDescription(rs.getString(3));
                 records.add(position);
             }
-            ps.close();
-            rs.close();
-        } catch (SQLException ex){
+        } catch (SQLException ex) {
             throw new SQLException("Error al obtener todos los cargos: " + ex.getMessage(), ex);
         } finally {
-            ps = null;
-            rs = null;
+            conn.disconnect();
+        }
+        return records;
+    }
+
+    /**
+     * Busca cargos cuyo título contenga la cadena ingresada.
+     */
+    public ArrayList<Position> search(String title) throws SQLException {
+        ArrayList<Position> records = new ArrayList<>();
+        String sql = "SELECT id, title, description FROM Positions WHERE title LIKE ?";
+
+        try (PreparedStatement ps = conn.connect().prepareStatement(sql)) {
+            ps.setString(1, "%" + title + "%");
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Position position = new Position();
+                    position.setId(rs.getInt(1));
+                    position.setTitle(rs.getString(2));
+                    position.setDescription(rs.getString(3));
+                    records.add(position);
+                }
+            }
+        } catch (SQLException ex) {
+            throw new SQLException("Error al buscar cargos: " + ex.getMessage(), ex);
+        } finally {
             conn.disconnect();
         }
         return records;
